@@ -22,21 +22,47 @@ const ffmpegSync = (fileName: string): Promise<string> => {
         resolve(newFileName);
       })
       .on("error", (err) => {
-        reject(new Error(err));
+        reject(new Error(err.message));
       });
   });
 };
 
 export const recognize_from_b64 = async (b64: string) => {
-  const audio = {
-    content: b64,
-  };
-  const request = {
-    audio: audio,
-    config: config,
-  };
-  const response = await client.recognize(request);
-  return response;
+  const api_endpoint = process.env.API_ENDPOINT
+  const api_key = process.env.API_KEY
+  const initial_response = await fetch(`${api_endpoint}/run`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${api_key}`
+    },
+    body: JSON.stringify({
+      "input": {
+        "language": "ja",
+        "model": "large-v3",
+      "audio_base64": b64
+      },
+    })
+  });
+  const job_id = (await initial_response.json()).id;
+  let response = null;
+  while (response === null) {
+    const job_response = await fetch(`${api_endpoint}/status/${job_id}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${api_key}`
+      }
+    });
+    response = await job_response.json();
+    if (response.status === "FAILED") {
+      throw new Error(response.error);
+    }
+    if (response.status === "IN_PROGRESS" || response.status === "IN_QUEUE") {
+      response = null;
+    }
+  }
+  return response.output.transcription;
 };
 
 export const recognize_from_file = async (fileName: string) => {

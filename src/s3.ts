@@ -20,7 +20,7 @@ const ffmpegSync = (fileName: string): Promise<string> => {
         resolve(newFileName);
       })
       .on("error", (err) => {
-        reject(new Error(err));
+        reject(new Error(err.message));
       });
   });
 };
